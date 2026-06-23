@@ -1,0 +1,15 @@
+{
+  "name": "wordle-clone",
+  "private": true,
+  "scripts": {
+    "dev:client": "pnpm --filter client dev",
+    "dev:server": "pnpm --filter server dev",
+    "test": "pnpm --filter server test",
+    "lint": "pnpm -r lint",
+    "build": "pnpm -r build"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}
