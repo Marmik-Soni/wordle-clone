@@ -3,6 +3,9 @@ import cors from "cors";
 import { connectDB } from "./config/db.js";
 import { env } from "./config/env.js";
 import { logger } from "./utils/logger.js";
+import { startCronJobs } from "./jobs/wordCron.js";
+import { checkAndRefillWords } from "./services/wordPipeline.service.js";
+import wordsRouter from "./routes/words.routes.js";
 
 const app = express();
 
@@ -13,8 +16,12 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok", env: env.NODE_ENV });
 });
 
+app.use("/api/words", wordsRouter);
+
 async function bootstrap() {
   await connectDB();
+  await checkAndRefillWords();
+  startCronJobs();
 
   app.listen(env.PORT, () => {
     logger.info(`Server running on port ${env.PORT} in ${env.NODE_ENV} mode`);
