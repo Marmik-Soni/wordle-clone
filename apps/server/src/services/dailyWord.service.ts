@@ -35,10 +35,13 @@ export async function getDailyWord(): Promise<DailyWordCache> {
     return cache;
   }
 
+  const count = await Word.countDocuments({ used: false });
+  const randomSkip = Math.floor(Math.random() * count);
+
   const nextWord = await Word.findOneAndUpdate(
     { used: false },
     { used: true, usedOn: today },
-    { new: true, sort: { addedAt: 1 } }
+    { new: true, skip: randomSkip }
   );
 
   if (!nextWord) {

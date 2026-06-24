@@ -3,7 +3,7 @@ import { Word } from "../models/Word.js";
 import { logger } from "../utils/logger.js";
 import { isValidWord, sanitizeWord } from "../utils/wordValidator.js";
 
-const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent`;
+const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent`;
 
 async function fetchWordsFromAI(count: number): Promise<string[]> {
   const prompt = `List exactly ${count} unique 5-letter English words for a Wordle game.
@@ -100,7 +100,9 @@ async function fetchWordsInBatches(
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     } catch (error) {
-      logger.warn(`⚠️  Batch ${i + 1}/${batches} failed — continuing`, { error });
+      logger.warn(`⚠️  Batch ${i + 1}/${batches} failed — continuing`, {
+        error: error instanceof Error ? error.message : String(error)
+      });
     }
   }
 
