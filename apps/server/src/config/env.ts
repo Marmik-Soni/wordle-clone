@@ -11,9 +11,10 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(32, "JWT_REFRESH_SECRET must be at least 32 characters"),
   JWT_EXPIRES_IN: z.string().default("15m"),
   JWT_REFRESH_EXPIRES_IN: z.string().default("7d"),
-  OPENROUTER_API_KEY: z.string().min(1, "OPENROUTER_API_KEY is required"),
+  GOOGLE_AI_API_KEY: z.string().min(1, "GOOGLE_AI_API_KEY is required"),
   WORD_REFILL_THRESHOLD: z.string().default("30"),
-  WORD_FETCH_COUNT: z.string().default("300"),
+  WORD_FETCH_COUNT: z.string().default("3000"),
+  WORD_BATCH_SIZE: z.string().default("100"),
 });
 
 const parsed = envSchema.safeParse(process.env);
