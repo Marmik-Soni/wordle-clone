@@ -20,7 +20,13 @@ app.use("/api/words", wordsRouter);
 
 async function bootstrap() {
   await connectDB();
-  await checkAndRefillWords();
+
+  try {
+    await checkAndRefillWords();
+  } catch (error) {
+    logger.error("Word pipeline failed on startup — server will continue", { error });
+  }
+
   startCronJobs();
 
   app.listen(env.PORT, () => {

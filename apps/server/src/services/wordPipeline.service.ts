@@ -6,15 +6,19 @@ import { isValidWord, sanitizeWord } from "../utils/wordValidator.js";
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
 
 async function fetchWordsFromAI(count: number): Promise<string[]> {
-  const prompt = `Generate exactly ${count} unique 5-letter English words suitable for a Wordle game.
+  const prompt = `List exactly ${count} unique 5-letter English words for a Wordle game.
 Rules:
-- Each word must be exactly 5 letters
-- Common English words only (nouns, verbs, adjectives that most people would know)
-- No proper nouns, no abbreviations, no slang
-- No offensive or inappropriate words
-- No repeated words
-- Return ONLY a JSON array of uppercase strings, nothing else
-Example format: ["CRANE", "AUDIO", "PLANT", "STONE"]`;
+- Exactly 5 letters each
+- Common words only (nouns, verbs, adjectives most people know)
+- No proper nouns, abbreviations, or slang
+- No offensive words
+- No repeats
+Return one word per line, uppercase, nothing else. No numbering, no JSON, no punctuation.
+Example:
+CRANE
+AUDIO
+PLANT
+STONE`;
 
   const response = await fetch(OPENROUTER_API_URL, {
     method: "POST",
@@ -25,9 +29,10 @@ Example format: ["CRANE", "AUDIO", "PLANT", "STONE"]`;
       "X-Title": "Wordle Clone",
     },
     body: JSON.stringify({
-      model: "google/gemini-2.0-flash-001",
+      model: "openrouter/auto",
       messages: [{ role: "user", content: prompt }],
       temperature: 0.8,
+      max_tokens: 2000,
     }),
   });
 
@@ -43,11 +48,36 @@ Example format: ["CRANE", "AUDIO", "PLANT", "STONE"]`;
   const content = data.choices[0]?.message?.content;
   if (!content) throw new Error("Empty response from AI");
 
-  const cleaned = content.replace(/```json|```/g, "").trim();
-  const parsed = JSON.parse(cleaned) as unknown;
-  if (!Array.isArray(parsed)) throw new Error("AI response is not an array");
+  // Parse one-word-per-line format — no JSON, no truncation issues
+  const words = content
+    .split("\n")
+    .map((line) => line.trim().toUpperCase())
+    .filter((line) => /^[A-Z]{5}$/.test(line));
 
-  return parsed.filter((w): w is string => typeof w === "string");
+  return words;
+}
+
+async function fetchWordsInBatches(totalCount: number, batchSize: number = 50): Promise<string[]> {
+  const batches = Math.ceil(totalCount / batchSize);
+  const allWords: string[] = [];
+
+  logger.info(`Fetching ${totalCount} words in ${batches} batches of ${batchSize}`);
+
+  for (let i = 0; i < batches; i++) {
+    logger.info(`Fetching batch ${i + 1}/${batches}`);
+    try {
+      const words = await fetchWordsFromAI(batchSize);
+      allWords.push(...words);
+      // Small delay between batches to avoid rate limiting
+      if (i < batches - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+    } catch (error) {
+      logger.warn(`Batch ${i + 1} failed — continuing with remaining batches`, { error });
+    }
+  }
+
+  return allWords;
 }
 
 export async function runWordPipeline(requestedCount: number): Promise<{
@@ -61,7 +91,7 @@ export async function runWordPipeline(requestedCount: number): Promise<{
   let rawWords: string[] = [];
 
   try {
-    rawWords = await fetchWordsFromAI(requestedCount);
+    rawWords = await fetchWordsInBatches(requestedCount, 50);
   } catch (error) {
     logger.error("Failed to fetch words from AI", { error });
     throw error;
