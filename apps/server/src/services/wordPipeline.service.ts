@@ -6,21 +6,26 @@ import { isValidWord, sanitizeWord } from "../utils/wordValidator.js";
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent`;
 
 async function fetchWordsFromAI(count: number): Promise<string[]> {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const randomLetters = Array.from(
+    { length: 6 },
+    () => alphabet[Math.floor(Math.random() * alphabet.length)]
+  ).join(", ");
+
   const prompt = `List exactly ${count} unique 5-letter English words for a Wordle game.
+
 Rules:
 - Exactly 5 letters each
-- Common everyday English words only (nouns, verbs, adjectives most people know)
-- Natural mix of starting letters — do NOT cluster around any particular letter
-- Prioritize words starting with common letters: S, T, R, C, B, P, M, F, H, W, G, D
+- Common everyday English words only
+- CRITICAL: Distribute evenly across ALL letters A through Z — approximately 25 words per starting letter
+- Do NOT list words alphabetically — mix them up randomly
 - No proper nouns, no abbreviations, no slang
-- No offensive or inappropriate words
+- No offensive words
 - No repeated words
-Return one word per line, uppercase, nothing else. No numbering, no JSON, no punctuation.
-Example:
-CRANE
-AUDIO
-PLANT
-STONE`;
+
+Return one word per line, uppercase, nothing else. No numbering, no JSON, no punctuation.`;
+
+  logger.info(`🎲 Random letter seed for this fetch: ${randomLetters}`);
 
   const response = await fetch(
     `${GEMINI_API_URL}?key=${env.GOOGLE_AI_API_KEY}`,
@@ -36,8 +41,8 @@ STONE`;
           },
         ],
         generationConfig: {
-          temperature: 0.9,
-          maxOutputTokens: 2048,
+          temperature: 0.95,
+          maxOutputTokens: 4096,
         },
       }),
     }
@@ -59,7 +64,6 @@ STONE`;
   const content = data.candidates[0]?.content?.parts[0]?.text;
   if (!content) throw new Error("Empty response from Gemini");
 
-  // Parse one word per line — resilient to any extra formatting
   const words = content
     .split("\n")
     .map((line) => line.trim().toUpperCase())
@@ -68,62 +72,22 @@ STONE`;
   return words;
 }
 
-async function fetchWordsInBatches(
-  totalCount: number,
-  batchSize: number
-): Promise<string[]> {
-  const batches = Math.ceil(totalCount / batchSize);
-  const allWords: string[] = [];
-  let totalFetched = 0;
-
-  logger.info(`📦 Fetching ${totalCount} words in ${batches} batches of ${batchSize}`);
-
-  for (let i = 0; i < batches; i++) {
-    logger.info(
-      `🔄 Batch ${i + 1}/${batches} — fetching ${batchSize} words (${totalFetched}/${totalCount} fetched so far)`
-    );
-    try {
-      const words = await fetchWordsFromAI(batchSize);
-      allWords.push(...words);
-      totalFetched += words.length;
-      logger.info(
-        `✅ Batch ${i + 1}/${batches} complete — got ${words.length} words (${totalFetched} total so far)`
-      );
-
-      if (totalFetched >= totalCount) {
-        logger.info(`🎯 Reached target of ${totalCount} words — stopping batches early`);
-        break;
-      }
-
-      // Delay between batches to respect rate limits
-      if (i < batches - 1) {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-      }
-    } catch (error) {
-      logger.warn(`⚠️  Batch ${i + 1}/${batches} failed — continuing`, {
-        error: error instanceof Error ? error.message : String(error)
-      });
-    }
-  }
-
-  return allWords;
-}
-
 export async function runWordPipeline(requestedCount: number): Promise<{
   fetched: number;
   validated: number;
   stored: number;
   duplicates: number;
 }> {
-  logger.info(`🚀 Word pipeline started — requesting ${requestedCount} words from AI`);
+  logger.info(`🚀 Word pipeline started — single API call for ${requestedCount} words`);
 
-  const batchSize = parseInt(env.WORD_BATCH_SIZE, 10);
   let rawWords: string[] = [];
 
   try {
-    rawWords = await fetchWordsInBatches(requestedCount, batchSize);
+    rawWords = await fetchWordsFromAI(requestedCount);
   } catch (error) {
-    logger.error("❌ Failed to fetch words from AI", { error });
+    logger.error("❌ Failed to fetch words from AI", {
+      error: error instanceof Error ? error.message : String(error)
+    });
     throw error;
   }
 
@@ -159,8 +123,8 @@ export async function runWordPipeline(requestedCount: number): Promise<{
   logger.info(`🎉 Pipeline complete — stored: ${stored}, duplicates skipped: ${duplicates}`);
   logger.info(`📈 Pipeline efficiency: ${efficiency}%`);
 
-  if (efficiency < 20) {
-    logger.warn(`⚠️  Pipeline efficiency critically low (${efficiency}%) — word pool may be exhausting`);
+  if (efficiency < 30) {
+    logger.warn(`⚠️  Pipeline efficiency low (${efficiency}%) — word pool may be exhausting`);
   }
 
   return { fetched: rawWords.length, validated: validWords.length, stored, duplicates };
@@ -184,7 +148,7 @@ export async function checkAndRefillWords(): Promise<void> {
     const requestCount = Math.ceil(fetchCount / (1 - overlapRate));
 
     logger.info(
-      `🔁 Below threshold — overlap rate: ${Math.round(overlapRate * 100)}%, requesting ${requestCount} words to get ~${fetchCount} net new`
+      `🔁 Below threshold — overlap rate: ${Math.round(overlapRate * 100)}%, requesting ${requestCount} words`
     );
 
     await runWordPipeline(requestCount);
