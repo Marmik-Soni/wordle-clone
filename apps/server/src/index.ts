@@ -9,6 +9,7 @@ import { checkAndRefillWords } from "./services/wordPipeline.service.js";
 import wordsRouter from "./routes/words.routes.js";
 import authRouter from "./routes/auth.routes.js";
 import userRouter from "./routes/user.routes.js";
+import gameRouter from "./routes/game.routes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { swaggerAuth } from "./middleware/swaggerAuth.js";
 import { swaggerSpec } from "./config/swagger.js";
@@ -36,6 +37,7 @@ app.use(
 // API routes
 app.use("/api/auth", authRouter);
 app.use("/api/user", userRouter);
+app.use("/api/game", gameRouter);
 app.use("/api/words", wordsRouter);
 
 // Error handler — must be last
