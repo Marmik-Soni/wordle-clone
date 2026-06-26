@@ -2,7 +2,7 @@ import mongoose, { Document, Schema } from "mongoose";
 
 export interface IGameSession extends Document {
   userId: mongoose.Types.ObjectId | null;
-  wordId: mongoose.Types.ObjectId;
+  wordId: mongoose.Types.ObjectId | null;
   date: string;
   guesses: string[];
   completed: boolean;
@@ -23,7 +23,8 @@ const GameSessionSchema = new Schema<IGameSession>(
     wordId: {
       type: Schema.Types.ObjectId,
       ref: "Word",
-      required: true,
+      required: false,
+      default: null,
     },
     date: {
       type: String,
