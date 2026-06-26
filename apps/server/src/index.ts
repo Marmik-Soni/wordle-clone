@@ -5,7 +5,6 @@ import { connectDB } from "./config/db.js";
 import { env } from "./config/env.js";
 import { logger } from "./utils/logger.js";
 import { startCronJobs } from "./jobs/wordCron.js";
-import { checkAndRefillWords } from "./services/wordPipeline.service.js";
 import wordsRouter from "./routes/words.routes.js";
 import authRouter from "./routes/auth.routes.js";
 import userRouter from "./routes/user.routes.js";
@@ -45,12 +44,6 @@ app.use(errorHandler);
 
 async function bootstrap() {
   await connectDB();
-
-  try {
-    await checkAndRefillWords();
-  } catch (error) {
-    logger.error("Word pipeline failed on startup — server will continue", { error });
-  }
 
   startCronJobs();
 
