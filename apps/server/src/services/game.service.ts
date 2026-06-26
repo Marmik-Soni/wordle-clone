@@ -1,8 +1,7 @@
 import { GameSession } from "../models/GameSession.js";
-import { Word } from "../models/Word.js";
 import { getDailyWord } from "./dailyWord.service.js";
 import { calculateColors } from "../utils/colorCalculator.js";
-import { isValidWord, sanitizeWord } from "../utils/wordValidator.js";
+import { isValidGuess } from "./wordList.service.js";
 import { logger } from "../utils/logger.js";
 import type { GuessResult, GameStatus } from "@wordle/shared";
 
@@ -49,10 +48,9 @@ export async function getOrCreateSession(
   userId: string | null,
   guestSessionId: string | null
 ): Promise<SessionState> {
-  const daily = await getDailyWord();
+  const daily = getDailyWord();
   const today = daily.date;
 
-  // Try to find existing session
   let session = null;
 
   if (userId) {
@@ -60,18 +58,14 @@ export async function getOrCreateSession(
   } else if (guestSessionId) {
     session = await GameSession.findById(guestSessionId);
     if (session && session.date !== today) {
-      session = null; // Guest session is from a previous day
+      session = null;
     }
   }
 
-  // Create new session if none found
   if (!session) {
-    const wordDoc = await Word.findById(daily.wordId);
-    if (!wordDoc) throw new Error("Daily word not found in DB");
-
     session = await GameSession.create({
       userId: userId ?? null,
-      wordId: wordDoc._id,
+      wordId: null,
       date: today,
       guesses: [],
       completed: false,
@@ -101,24 +95,21 @@ export async function submitGuess(
   if (session.completed) throw new Error("Game already completed");
   if (session.guesses.length >= 6) throw new Error("Maximum guesses reached");
 
-  // Auth check — if session belongs to a user, verify
   if (session.userId && userId !== session.userId.toString()) {
     throw new Error("Unauthorized");
   }
 
-  const sanitized = sanitizeWord(guess);
+  const sanitized = guess.toUpperCase().trim();
 
-  if (!isValidWord(sanitized)) {
+  if (!/^[A-Z]{5}$/.test(sanitized)) {
     throw new Error("Invalid word");
   }
 
-  // Check if word exists in dictionary
-  const wordExists = await Word.findOne({ word: sanitized });
-  if (!wordExists) {
+  if (!isValidGuess(sanitized)) {
     throw new Error("Word not in dictionary");
   }
 
-  const daily = await getDailyWord();
+  const daily = getDailyWord();
   const colors = calculateColors(sanitized, daily.word);
 
   const isWin = sanitized === daily.word;
@@ -135,12 +126,10 @@ export async function submitGuess(
 
   const result: GuessResult = { guess: sanitized, colors };
   const sessionState = buildSessionState(session, daily.word, daily.wordNumber);
-
-  // Include correct word only when game is over
   const correctWord = completed && !isWin ? daily.word : undefined;
 
   logger.info(
-    `🎯 Guess submitted: ${sanitized} — ${isWin ? "WIN" : completed ? "LOSS" : "continuing"}`
+    `🎯 Guess: ${sanitized} — ${isWin ? "WIN 🎉" : completed ? "LOSS 😔" : "continuing"}`
   );
 
   return { result, sessionState, correctWord };
@@ -164,8 +153,7 @@ export async function updateUserStats(
 
   const isConsecutiveDay =
     lastPlayed &&
-    new Date(today).getTime() - new Date(lastPlayed).getTime() ===
-      86400000;
+    new Date(today).getTime() - new Date(lastPlayed).getTime() === 86400000;
 
   user.stats.gamesPlayed += 1;
 
