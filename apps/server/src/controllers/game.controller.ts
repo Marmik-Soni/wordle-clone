@@ -19,7 +19,9 @@ export async function getTodayMeta(
       wordNumber: daily.wordNumber,
     });
   } catch (error) {
-    logger.error("❌ Failed to get today meta", { error });
+    logger.error("❌ Failed to get today meta", {
+      error: error instanceof Error ? error.message : String(error)
+    });
     res.status(500).json({ error: "Internal server error" });
   }
 }
