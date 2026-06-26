@@ -136,8 +136,8 @@ export async function getUnusedWordCount(): Promise<number> {
 
 export async function checkAndRefillWords(): Promise<void> {
   const count = await getUnusedWordCount();
-  const threshold = parseInt(env.WORD_REFILL_THRESHOLD, 10);
-  const fetchCount = parseInt(env.WORD_FETCH_COUNT, 10);
+  const threshold = parseInt(process.env.WORD_REFILL_THRESHOLD || "30", 10);
+  const fetchCount = parseInt(process.env.WORD_FETCH_COUNT || "500", 10);
 
   logger.info(`📊 Unused word count: ${count} (threshold: ${threshold})`);
 

@@ -15,7 +15,7 @@ export async function getWordCount(req: Request, res: Response): Promise<void> {
 
 export async function triggerWordFetch(req: Request, res: Response): Promise<void> {
   try {
-    const count = parseInt(env.WORD_FETCH_COUNT, 10);
+    const count = parseInt(process.env.WORD_FETCH_COUNT || "500", 10);
     const result = await runWordPipeline(count);
     res.json({ success: true, result });
   } catch (error) {
