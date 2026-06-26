@@ -2,4 +2,5 @@ packages:
   - 'apps/*'
   - 'packages/*'
 allowBuilds:
-  - esbuild
+  '0': esbuild
+  '@scarf/scarf': false
