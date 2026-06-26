@@ -14,6 +14,8 @@ const envSchema = z.object({
   GOOGLE_AI_API_KEY: z.string().min(1, "GOOGLE_AI_API_KEY is required"),
   WORD_REFILL_THRESHOLD: z.string().default("30"),
   WORD_FETCH_COUNT: z.string().default("500"),
+  DOCS_USER: z.string().default("admin"),
+  DOCS_PASSWORD: z.string().default("wordle_docs_2024"),
 });
 
 const parsed = envSchema.safeParse(process.env);
