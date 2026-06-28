@@ -12,11 +12,12 @@ import gameRouter from "./routes/game.routes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { swaggerAuth } from "./middleware/swaggerAuth.js";
 import { swaggerSpec } from "./config/swagger.js";
+import { notFoundHandler } from "./middleware/notFound.js";
 
 const app = express();
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "10kb" }));
 
 // Health check
 app.get("/health", (_req, res) => {
@@ -40,6 +41,7 @@ app.use("/api/game", gameRouter);
 app.use("/api/words", wordsRouter);
 
 // Error handler — must be last
+app.use(notFoundHandler);
 app.use(errorHandler);
 
 async function bootstrap() {
