@@ -1,8 +1,18 @@
+import mongoose from "mongoose";
 import { GameSession } from "../models/GameSession.js";
+import { Word } from "../models/Word.js";
 import { getDailyWord } from "./dailyWord.service.js";
 import { calculateColors } from "../utils/colorCalculator.js";
-import { isValidGuess } from "./wordList.service.js";
+import { isValidWord, sanitizeWord } from "../utils/wordValidator.js";
 import { logger } from "../utils/logger.js";
+import {
+  BadRequestError,
+  NotFoundError,
+  ConflictError,
+  ForbiddenError,
+  UnprocessableEntityError,
+  ServiceUnavailableError,
+} from "../utils/errors.js";
 import type { GuessResult, GameStatus } from "@wordle/shared";
 
 export interface SessionState {
@@ -48,7 +58,7 @@ export async function getOrCreateSession(
   userId: string | null,
   guestSessionId: string | null
 ): Promise<SessionState> {
-  const daily = getDailyWord();
+  const daily = await getDailyWord();
   const today = daily.date;
 
   let session = null;
@@ -56,16 +66,27 @@ export async function getOrCreateSession(
   if (userId) {
     session = await GameSession.findOne({ userId, date: today });
   } else if (guestSessionId) {
+    if (!mongoose.Types.ObjectId.isValid(guestSessionId)) {
+      throw new BadRequestError("Invalid sessionId format", "INVALID_SESSION_ID");
+    }
     session = await GameSession.findById(guestSessionId);
     if (session && session.date !== today) {
-      session = null;
+      session = null; // Guest session is from a previous day
     }
   }
 
   if (!session) {
+    const wordDoc = await Word.findOne({ word: daily.word });
+    if (!wordDoc) {
+      throw new ServiceUnavailableError(
+        "Daily word not found — word list may not have loaded correctly",
+        "WORD_LIST_NOT_LOADED"
+      );
+    }
+
     session = await GameSession.create({
       userId: userId ?? null,
-      wordId: null,
+      wordId: wordDoc._id,
       date: today,
       guesses: [],
       completed: false,
@@ -89,27 +110,47 @@ export async function submitGuess(
   sessionState: SessionState;
   correctWord?: string;
 }> {
+  if (!mongoose.Types.ObjectId.isValid(sessionId)) {
+    throw new BadRequestError("Invalid sessionId format", "INVALID_SESSION_ID");
+  }
+
   const session = await GameSession.findById(sessionId);
 
-  if (!session) throw new Error("Session not found");
-  if (session.completed) throw new Error("Game already completed");
-  if (session.guesses.length >= 6) throw new Error("Maximum guesses reached");
+  if (!session) {
+    throw new NotFoundError("Game session not found", "SESSION_NOT_FOUND");
+  }
+  if (session.completed) {
+    throw new ConflictError("Game already completed", "GAME_ALREADY_COMPLETED");
+  }
+  if (session.guesses.length >= 6) {
+    throw new ConflictError("Maximum guesses reached", "MAX_GUESSES_EXCEEDED");
+  }
 
   if (session.userId && userId !== session.userId.toString()) {
-    throw new Error("Unauthorized");
+    throw new ForbiddenError(
+      "This game session belongs to a different user",
+      "FORBIDDEN"
+    );
   }
 
-  const sanitized = guess.toUpperCase().trim();
+  const sanitized = sanitizeWord(guess);
 
-  if (!/^[A-Z]{5}$/.test(sanitized)) {
-    throw new Error("Invalid word");
+  if (!isValidWord(sanitized)) {
+    throw new BadRequestError(
+      "Guess must be exactly 5 alphabetic characters",
+      "INVALID_GUESS_FORMAT"
+    );
   }
 
-  if (!isValidGuess(sanitized)) {
-    throw new Error("Word not in dictionary");
+  const wordExists = await Word.findOne({ word: sanitized });
+  if (!wordExists) {
+    throw new UnprocessableEntityError(
+      "Word not in dictionary",
+      "WORD_NOT_IN_DICTIONARY"
+    );
   }
 
-  const daily = getDailyWord();
+  const daily = await getDailyWord();
   const colors = calculateColors(sanitized, daily.word);
 
   const isWin = sanitized === daily.word;
@@ -129,7 +170,7 @@ export async function submitGuess(
   const correctWord = completed && !isWin ? daily.word : undefined;
 
   logger.info(
-    `🎯 Guess: ${sanitized} — ${isWin ? "WIN 🎉" : completed ? "LOSS 😔" : "continuing"}`
+    `🎯 Guess submitted: ${sanitized} — ${isWin ? "WIN" : completed ? "LOSS" : "continuing"}`
   );
 
   return { result, sessionState, correctWord };
