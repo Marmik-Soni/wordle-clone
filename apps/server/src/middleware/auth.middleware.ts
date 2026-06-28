@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { verifyAccessToken, type TokenPayload } from "../utils/jwt.js";
+import { UnauthorizedError } from "../utils/errors.js";
 
 export interface AuthRequest extends Request {
   user?: TokenPayload;
@@ -13,8 +14,7 @@ export function requireAuth(
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    res.status(401).json({ error: "No token provided" });
-    return;
+    throw new UnauthorizedError("No token provided", "UNAUTHORIZED");
   }
 
   const token = authHeader.split(" ")[1];
@@ -24,6 +24,6 @@ export function requireAuth(
     req.user = payload;
     next();
   } catch {
-    res.status(401).json({ error: "Invalid or expired token" });
+    throw new UnauthorizedError("Invalid or expired token", "UNAUTHORIZED");
   }
 }
