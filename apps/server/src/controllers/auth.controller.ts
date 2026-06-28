@@ -53,11 +53,13 @@ export async function login(req: Request, res: Response): Promise<void> {
 
   const user = await User.findOne({ email: email.toLowerCase() });
   if (!user) {
+    logger.warn(`⚠️  Failed login attempt - user not found: ${email}`);
     throw new UnauthorizedError("Invalid credentials", "INVALID_CREDENTIALS");
   }
 
   const isValid = await bcrypt.compare(password, user.passwordHash);
   if (!isValid) {
+    logger.warn(`⚠️  Failed login attempt - wrong password for: ${email}`);
     throw new UnauthorizedError("Invalid credentials", "INVALID_CREDENTIALS");
   }
 
