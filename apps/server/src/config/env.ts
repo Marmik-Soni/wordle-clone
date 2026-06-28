@@ -12,6 +12,8 @@ const envSchema = z.object({
   JWT_EXPIRES_IN: z.string().default("15m"),
   JWT_REFRESH_EXPIRES_IN: z.string().default("7d"),
   GOOGLE_AI_API_KEY: z.string().optional(),
+  WORD_REFILL_THRESHOLD: z.string().default("30"),
+  WORD_FETCH_COUNT: z.string().default("500"),
   DOCS_USER: z.string().default("admin"),
   DOCS_PASSWORD: z.string().default("wordle_docs_2024"),
 });
