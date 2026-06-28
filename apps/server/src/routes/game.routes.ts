@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { optionalAuth } from "../middleware/optionalAuth.js";
 import { getTodayMeta, getSession, guess } from "../controllers/game.controller.js";
+import { catchAsync } from "../utils/catchAsync.js";
 
 const router = Router();
 
@@ -25,7 +26,7 @@ const router = Router();
  *                   type: number
  *                   example: 1
  */
-router.get("/today", getTodayMeta);
+router.get("/today", catchAsync(getTodayMeta));
 
 /**
  * @swagger
@@ -52,7 +53,7 @@ router.get("/today", getTodayMeta);
  *                 session:
  *                   $ref: '#/components/schemas/GameSession'
  */
-router.get("/session", optionalAuth, getSession);
+router.get("/session", optionalAuth, catchAsync(getSession));
 
 /**
  * @swagger
@@ -100,6 +101,6 @@ router.get("/session", optionalAuth, getSession);
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post("/guess", optionalAuth, guess);
+router.post("/guess", optionalAuth, catchAsync(guess));
 
 export default router;
