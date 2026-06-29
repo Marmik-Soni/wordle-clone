@@ -2,6 +2,7 @@ import { Router } from "express";
 import { optionalAuth } from "../middleware/optionalAuth.js";
 import { getTodayMeta, getSession, guess } from "../controllers/game.controller.js";
 import { catchAsync } from "../utils/catchAsync.js";
+import { guessRateLimiter } from "../middleware/rateLimiter.js";
 
 const router = Router();
 
@@ -101,6 +102,6 @@ router.get("/session", optionalAuth, catchAsync(getSession));
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post("/guess", optionalAuth, catchAsync(guess));
+router.post("/guess", guessRateLimiter, optionalAuth, catchAsync(guess));
 
 export default router;

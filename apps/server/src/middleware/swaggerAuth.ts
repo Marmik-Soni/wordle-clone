@@ -1,5 +1,12 @@
+import { timingSafeEqual } from "crypto";
 import type { Request, Response, NextFunction } from "express";
 import { env } from "../config/env.js";
+
+/** Constant-time string comparison to prevent timing attacks. */
+function safeCompare(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
+}
 
 export function swaggerAuth(
   req: Request,
@@ -16,9 +23,10 @@ export function swaggerAuth(
 
   const base64 = authHeader.split(" ")[1];
   const decoded = Buffer.from(base64, "base64").toString("utf-8");
-  const [username, password] = decoded.split(":");
+  const [username, ...rest] = decoded.split(":");
+  const password = rest.join(":"); // handles passwords that contain ":"
 
-  if (username !== env.DOCS_USER || password !== env.DOCS_PASSWORD) {
+  if (!safeCompare(username ?? "", env.DOCS_USER) || !safeCompare(password, env.DOCS_PASSWORD)) {
     res.setHeader("WWW-Authenticate", 'Basic realm="API Docs"');
     res.status(401).json({ error: "Invalid credentials" });
     return;
