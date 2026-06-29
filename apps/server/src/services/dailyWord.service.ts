@@ -9,6 +9,11 @@ export interface DailyWordCache {
 
 let cache: DailyWordCache | null = null;
 
+/**
+ * Returns today's daily word from the in-memory cache.
+ * This function is intentionally synchronous — it reads from a cached value
+ * and never performs I/O. Do NOT add `await` at call sites.
+ */
 export function getDailyWord(): DailyWordCache {
   const today = getTodayDateString();
 

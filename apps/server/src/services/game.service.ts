@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import { GameSession } from "../models/GameSession.js";
-import { Word } from "../models/Word.js";
 import { getDailyWord } from "./dailyWord.service.js";
+import { isValidGuess } from "./wordList.service.js";
 import { calculateColors } from "../utils/colorCalculator.js";
 import { isValidWord, sanitizeWord } from "../utils/wordValidator.js";
 import { logger } from "../utils/logger.js";
@@ -11,7 +11,6 @@ import {
   ConflictError,
   ForbiddenError,
   UnprocessableEntityError,
-  ServiceUnavailableError,
 } from "../utils/errors.js";
 import type { GuessResult, GameStatus } from "@wordle/shared";
 
@@ -58,7 +57,8 @@ export async function getOrCreateSession(
   userId: string | null,
   guestSessionId: string | null
 ): Promise<SessionState> {
-  const daily = await getDailyWord();
+  // getDailyWord() is intentionally synchronous — no await needed
+  const daily = getDailyWord();
   const today = daily.date;
 
   let session = null;
@@ -76,17 +76,8 @@ export async function getOrCreateSession(
   }
 
   if (!session) {
-    const wordDoc = await Word.findOne({ word: daily.word });
-    if (!wordDoc) {
-      throw new ServiceUnavailableError(
-        "Daily word not found — word list may not have loaded correctly",
-        "WORD_LIST_NOT_LOADED"
-      );
-    }
-
     session = await GameSession.create({
       userId: userId ?? null,
-      wordId: wordDoc._id,
       date: today,
       guesses: [],
       completed: false,
@@ -126,6 +117,7 @@ export async function submitGuess(
     throw new ConflictError("Maximum guesses reached", "MAX_GUESSES_EXCEEDED");
   }
 
+  // Ownership check for authenticated sessions
   if (session.userId && userId !== session.userId.toString()) {
     throw new ForbiddenError(
       "This game session belongs to a different user",
@@ -142,15 +134,16 @@ export async function submitGuess(
     );
   }
 
-  const wordExists = await Word.findOne({ word: sanitized });
-  if (!wordExists) {
+  // Use in-memory word list instead of a DB round-trip per guess
+  if (!isValidGuess(sanitized)) {
     throw new UnprocessableEntityError(
       "Word not in dictionary",
       "WORD_NOT_IN_DICTIONARY"
     );
   }
 
-  const daily = await getDailyWord();
+  // getDailyWord() is synchronous — no await needed
+  const daily = getDailyWord();
   const colors = calculateColors(sanitized, daily.word);
 
   const isWin = sanitized === daily.word;
@@ -174,49 +167,4 @@ export async function submitGuess(
   );
 
   return { result, sessionState, correctWord };
-}
-
-export async function updateUserStats(
-  userId: string,
-  won: boolean,
-  guessCount: number | null,
-  lastPlayedDate: string
-): Promise<void> {
-  const { User } = await import("../models/User.js");
-
-  const user = await User.findById(userId);
-  if (!user) return;
-
-  const today = lastPlayedDate;
-  const lastPlayed = user.stats.lastPlayedDate
-    ? user.stats.lastPlayedDate.toISOString().split("T")[0]
-    : null;
-
-  const isConsecutiveDay =
-    lastPlayed &&
-    new Date(today).getTime() - new Date(lastPlayed).getTime() === 86400000;
-
-  user.stats.gamesPlayed += 1;
-
-  if (won) {
-    user.stats.gamesWon += 1;
-    user.stats.currentStreak = isConsecutiveDay
-      ? user.stats.currentStreak + 1
-      : 1;
-    user.stats.maxStreak = Math.max(
-      user.stats.maxStreak,
-      user.stats.currentStreak
-    );
-    if (guessCount !== null) {
-      const key = guessCount.toString() as "1" | "2" | "3" | "4" | "5" | "6";
-      user.stats.guessDistribution[key] += 1;
-    }
-  } else {
-    user.stats.currentStreak = 0;
-  }
-
-  user.stats.lastPlayedDate = new Date(today);
-  await user.save();
-
-  logger.info(`📊 Stats updated for user ${userId}`);
 }

@@ -1,11 +1,8 @@
 import mongoose from "mongoose";
 import type { Response } from "express";
 import type { AuthRequest } from "../middleware/auth.middleware.js";
-import {
-  getOrCreateSession,
-  submitGuess,
-  updateUserStats,
-} from "../services/game.service.js";
+import { getOrCreateSession, submitGuess } from "../services/game.service.js";
+import { updateUserStats } from "../services/user.service.js";
 import { getDailyWord } from "../services/dailyWord.service.js";
 import { BadRequestError } from "../utils/errors.js";
 
@@ -13,7 +10,8 @@ export async function getTodayMeta(
   req: AuthRequest,
   res: Response
 ): Promise<void> {
-  const daily = await getDailyWord();
+  // getDailyWord() is synchronous — no await needed
+  const daily = getDailyWord();
   res.json({
     date: daily.date,
     wordNumber: daily.wordNumber,

@@ -36,4 +36,13 @@ export function getTotalAnswerWords(): number {
   return answerWords.length;
 }
 
-logger.info(`📚 Word lists loaded — ${answerWords.length} answers, ${validWords.length} valid guesses`);
+/**
+ * Logs word list statistics.
+ * Called explicitly from bootstrap() — NOT at module import time,
+ * which would make unit tests noisy and module loading unpredictable.
+ */
+export function logWordListStats(): void {
+  logger.info(
+    `📚 Word lists loaded — ${answerWords.length} answers, ${validWords.length} valid guesses`
+  );
+}
