@@ -16,6 +16,10 @@ const envSchema = z.object({
   WORD_FETCH_COUNT: z.string().default("500"),
   DOCS_USER: z.string().default("admin"),
   DOCS_PASSWORD: z.string().default("wordle_docs_2024"),
+  // Comma-separated list of allowed CORS origins. Defaults to localhost in dev.
+  ALLOWED_ORIGINS: z.string().optional(),
+  // Secret key required in x-admin-key header to access admin-only endpoints.
+  ADMIN_API_KEY: z.string().min(32, "ADMIN_API_KEY must be at least 32 characters"),
 });
 
 const parsed = envSchema.safeParse(process.env);

@@ -1,10 +1,12 @@
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
 import swaggerUi from "swagger-ui-express";
 import { connectDB } from "./config/db.js";
 import { env } from "./config/env.js";
 import { logger } from "./utils/logger.js";
 import { startCronJobs } from "./jobs/wordCron.js";
+import { logWordListStats } from "./services/wordList.service.js";
 import wordsRouter from "./routes/words.routes.js";
 import authRouter from "./routes/auth.routes.js";
 import userRouter from "./routes/user.routes.js";
@@ -16,12 +18,33 @@ import { notFoundHandler } from "./middleware/notFound.js";
 
 const app = express();
 
-app.use(cors());
+// Security headers — must be first
+app.use(helmet());
+
+// CORS — restrict to configured origins
+const allowedOrigins = env.ALLOWED_ORIGINS
+  ? env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
+  : ["http://localhost:5173", "http://localhost:3000"];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow server-to-server requests (no Origin header) and allowed origins
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS: origin '${origin}' not allowed`));
+      }
+    },
+    credentials: true,
+  })
+);
+
 app.use(express.json({ limit: "10kb" }));
 
-// Health check
+// Health check — no internal info exposed
 app.get("/health", (_req, res) => {
-  res.json({ status: "ok", env: env.NODE_ENV });
+  res.json({ status: "ok" });
 });
 
 // Swagger docs — password protected
@@ -46,6 +69,9 @@ app.use(errorHandler);
 
 async function bootstrap() {
   await connectDB();
+
+  // Log word list stats explicitly (removes module-level side effect)
+  logWordListStats();
 
   startCronJobs();
 
