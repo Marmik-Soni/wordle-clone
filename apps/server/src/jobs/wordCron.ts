@@ -1,5 +1,6 @@
 import cron from "node-cron";
 import { clearDailyWordCache } from "../services/dailyWord.service.js";
+import { checkAndRefillWords } from "../services/wordPipeline.service.js";
 import { logger } from "../utils/logger.js";
 
 export function startCronJobs(): void {
@@ -9,5 +10,17 @@ export function startCronJobs(): void {
     clearDailyWordCache();
   });
 
-  logger.info("⏰ Cron jobs started");
+  // Every day at 2 AM UTC — check and refill the word pool if below threshold
+  cron.schedule("0 2 * * *", async () => {
+    logger.info("⏰ Cron: checking word pool threshold");
+    try {
+      await checkAndRefillWords();
+    } catch (error) {
+      logger.error("❌ Cron: word refill failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  logger.info("⏰ Cron jobs started (daily word refresh at 18:30 UTC, word refill at 02:00 UTC)");
 }

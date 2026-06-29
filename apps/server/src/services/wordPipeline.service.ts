@@ -3,9 +3,14 @@ import { Word } from "../models/Word.js";
 import { logger } from "../utils/logger.js";
 import { isValidWord, sanitizeWord } from "../utils/wordValidator.js";
 
-const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent`;
+const GEMINI_API_URL =
+  "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent";
 
 async function fetchWordsFromAI(count: number): Promise<string[]> {
+  if (!env.GOOGLE_AI_API_KEY) {
+    throw new Error("GOOGLE_AI_API_KEY is not configured");
+  }
+
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   const randomLetters = Array.from(
     { length: 6 },
@@ -27,33 +32,33 @@ Return one word per line, uppercase, nothing else. No numbering, no JSON, no pun
 
   logger.info(`🎲 Random letter seed for this fetch: ${randomLetters}`);
 
-  const response = await fetch(
-    `${GEMINI_API_URL}?key=${env.GOOGLE_AI_API_KEY}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [{ text: prompt }],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.95,
-          maxOutputTokens: 4096,
+  // API key is passed in the request header — NOT in the URL query string —
+  // to prevent it from appearing in server access logs or proxy logs.
+  const response = await fetch(GEMINI_API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": env.GOOGLE_AI_API_KEY,
+    },
+    body: JSON.stringify({
+      contents: [
+        {
+          parts: [{ text: prompt }],
         },
-      }),
-    }
-  );
+      ],
+      generationConfig: {
+        temperature: 0.95,
+        maxOutputTokens: 4096,
+      },
+    }),
+  });
 
   if (!response.ok) {
     const error = await response.text();
     throw new Error(`Gemini API error: ${response.status} — ${error}`);
   }
 
-  const data = await response.json() as {
+  const data = (await response.json()) as {
     candidates: Array<{
       content: {
         parts: Array<{ text: string }>;
@@ -86,7 +91,7 @@ export async function runWordPipeline(requestedCount: number): Promise<{
     rawWords = await fetchWordsFromAI(requestedCount);
   } catch (error) {
     logger.error("❌ Failed to fetch words from AI", {
-      error: error instanceof Error ? error.message : String(error)
+      error: error instanceof Error ? error.message : String(error),
     });
     throw error;
   }
@@ -118,7 +123,9 @@ export async function runWordPipeline(requestedCount: number): Promise<{
     }
   }
 
-  const efficiency = Math.round((stored / rawWords.length) * 100);
+  const efficiency = rawWords.length > 0
+    ? Math.round((stored / rawWords.length) * 100)
+    : 0;
 
   logger.info(`🎉 Pipeline complete — stored: ${stored}, duplicates skipped: ${duplicates}`);
   logger.info(`📈 Pipeline efficiency: ${efficiency}%`);
@@ -136,12 +143,19 @@ export async function getUnusedWordCount(): Promise<number> {
 
 export async function checkAndRefillWords(): Promise<void> {
   const count = await getUnusedWordCount();
-  const threshold = parseInt(process.env.WORD_REFILL_THRESHOLD || "30", 10);
-  const fetchCount = parseInt(process.env.WORD_FETCH_COUNT || "500", 10);
+
+  // Use validated env object — not raw process.env
+  const threshold = parseInt(env.WORD_REFILL_THRESHOLD, 10);
+  const fetchCount = parseInt(env.WORD_FETCH_COUNT, 10);
 
   logger.info(`📊 Unused word count: ${count} (threshold: ${threshold})`);
 
   if (count < threshold) {
+    if (!env.GOOGLE_AI_API_KEY) {
+      logger.warn("⚠️  Word refill needed but GOOGLE_AI_API_KEY is not set — skipping");
+      return;
+    }
+
     const existingTotal = await Word.countDocuments({});
     const TOTAL_POSSIBLE_WORDS = 5000;
     const overlapRate = Math.min(existingTotal / TOTAL_POSSIBLE_WORDS, 0.8);

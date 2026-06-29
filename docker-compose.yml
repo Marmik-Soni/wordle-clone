@@ -13,11 +13,18 @@ services:
       - mongo
     environment:
       - NODE_ENV=development
+      # Override the MongoDB URI to use the authenticated local instance
+      - MONGODB_URI=mongodb://root:devpassword@mongo:27017/wordle-clone?authSource=admin
 
   mongo:
     image: mongo:7
+    # Bind to localhost only — not exposed to the entire network
     ports:
-      - "27017:27017"
+      - "127.0.0.1:27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: devpassword
+      MONGO_INITDB_DATABASE: wordle-clone
     volumes:
       - mongo_data:/data/db
 
