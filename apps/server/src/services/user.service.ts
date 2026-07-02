@@ -20,9 +20,16 @@ export async function updateUserStats(
     ? user.stats.lastPlayedDate.toISOString().split("T")[0]
     : null;
 
-  // A win is a "consecutive" day if the previous play was exactly 1 day ago
+  // Guard: if already updated today (e.g. a duplicate completion event), skip.
+  // Prevents same-day replay from resetting the streak.
+  if (lastPlayed === today) {
+    logger.info(`📊 Stats already up to date for user ${userId} on ${today} — skipping`);
+    return;
+  }
+
+  // A win is "consecutive" if the previous play was exactly 1 day before today.
   const isConsecutiveDay =
-    lastPlayed &&
+    lastPlayed != null &&
     new Date(today).getTime() - new Date(lastPlayed).getTime() === 86_400_000;
 
   user.stats.gamesPlayed += 1;

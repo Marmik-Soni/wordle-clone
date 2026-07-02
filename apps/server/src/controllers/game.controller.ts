@@ -5,6 +5,7 @@ import { getOrCreateSession, submitGuess } from "../services/game.service.js";
 import { updateUserStats } from "../services/user.service.js";
 import { getDailyWord } from "../services/dailyWord.service.js";
 import { BadRequestError } from "../utils/errors.js";
+import { logger } from "../utils/logger.js";
 
 export async function getTodayMeta(
   req: AuthRequest,
@@ -53,13 +54,24 @@ export async function guess(req: AuthRequest, res: Response): Promise<void> {
     userId
   );
 
+  // Update stats if this game just completed for an authenticated user.
+  // Wrapped in try/catch so a stats failure never corrupts the game response —
+  // the game result is the source of truth; stats can be reconciled if needed.
   if (sessionState.completed && userId) {
-    await updateUserStats(
-      userId,
-      sessionState.won,
-      sessionState.won ? 6 - sessionState.remainingGuesses : null,
-      sessionState.date
-    );
+    try {
+      await updateUserStats(
+        userId,
+        sessionState.won,
+        sessionState.won ? 6 - sessionState.remainingGuesses : null,
+        sessionState.date
+      );
+    } catch (statsErr) {
+      logger.error("❌ Stats update failed after game completion — game result is unaffected", {
+        userId,
+        sessionId,
+        error: statsErr instanceof Error ? statsErr.message : String(statsErr),
+      });
+    }
   }
 
   res.json({
