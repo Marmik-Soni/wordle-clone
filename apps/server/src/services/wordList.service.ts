@@ -1,10 +1,11 @@
-import { createRequire } from "module";
+// Native ESM JSON imports — works with tsx (dev) and tsc + Node 20+ (prod).
+// "resolveJsonModule": true is set in tsconfig.base.json.
+import answerWordsJson from "../data/answerWords.json" with { type: "json" };
+import validWordsJson from "../data/validWords.json" with { type: "json" };
 import { logger } from "../utils/logger.js";
 
-const require = createRequire(import.meta.url);
-
-const answerWords: string[] = require("../data/answerWords.json");
-const validWords: string[] = require("../data/validWords.json");
+const answerWords = answerWordsJson as string[];
+const validWords = validWordsJson as string[];
 
 const ANSWER_SET = new Set<string>(answerWords);
 const VALID_SET = new Set<string>(validWords);
@@ -14,7 +15,7 @@ const EPOCH = new Date("2021-06-19").getTime();
 const MS_PER_DAY = 86400000;
 
 export function getTodayDateString(): string {
-  return new Date().toISOString().split("T")[0];
+  return new Date().toISOString().split("T")[0]!;
 }
 
 export function getDayIndex(dateString: string): number {
@@ -24,7 +25,7 @@ export function getDayIndex(dateString: string): number {
 
 export function getAnswerForDate(dateString: string): string {
   const index = getDayIndex(dateString);
-  return answerWords[index % answerWords.length];
+  return answerWords[index % answerWords.length]!;
 }
 
 export function isValidGuess(word: string): boolean {

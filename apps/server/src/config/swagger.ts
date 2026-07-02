@@ -15,7 +15,7 @@ const options: swaggerJsdoc.Options = {
         description: "Development server",
       },
       ...(env.NODE_ENV === "production"
-        ? [{ url: "https://api.your-domain.com", description: "Production server" }]
+        ? [{ url: env.API_URL ?? "https://api.your-domain.com", description: "Production server" }]
         : []),
     ],
     components: {

@@ -20,6 +20,9 @@ const envSchema = z.object({
   ALLOWED_ORIGINS: z.string().optional(),
   // Secret key required in x-admin-key header to access admin-only endpoints.
   ADMIN_API_KEY: z.string().min(32, "ADMIN_API_KEY must be at least 32 characters"),
+  // Public-facing API base URL — used in Swagger docs for the production server entry.
+  // Example: https://api.yourdomain.com
+  API_URL: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
