@@ -8,22 +8,23 @@ export interface AuthRequest extends Request {
 
 export function requireAuth(
   req: AuthRequest,
-  res: Response,
+  _res: Response,
   next: NextFunction
 ): void {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    throw new UnauthorizedError("No token provided", "UNAUTHORIZED");
+    next(new UnauthorizedError("No token provided", "UNAUTHORIZED"));
+    return;
   }
 
-  const token = authHeader.split(" ")[1];
+  const token = authHeader.split(" ")[1]!;
 
   try {
-    const payload = verifyAccessToken(token!);
+    const payload = verifyAccessToken(token);
     req.user = payload;
     next();
   } catch {
-    throw new UnauthorizedError("Invalid or expired token", "UNAUTHORIZED");
+    next(new UnauthorizedError("Invalid or expired token", "UNAUTHORIZED"));
   }
 }

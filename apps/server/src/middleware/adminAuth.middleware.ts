@@ -3,10 +3,15 @@ import type { Request, Response, NextFunction } from "express";
 import { env } from "../config/env.js";
 import { UnauthorizedError, ForbiddenError } from "../utils/errors.js";
 
+/** Constant-time string comparison — prevents timing-based key enumeration. */
+function safeCompare(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
+}
+
 /**
  * Middleware that requires a valid `x-admin-key` header.
  * Used to protect internal/admin endpoints like the word pipeline.
- * Comparison is timing-safe to prevent timing-based key enumeration.
  */
 export function adminAuth(
   req: Request,
@@ -16,25 +21,16 @@ export function adminAuth(
   const providedKey = req.headers["x-admin-key"];
 
   if (!providedKey || typeof providedKey !== "string") {
-    throw new UnauthorizedError(
+    next(new UnauthorizedError(
       "Admin key required — provide x-admin-key header",
       "ADMIN_KEY_MISSING"
-    );
+    ));
+    return;
   }
 
-  const expected = env.ADMIN_API_KEY;
-
-  // Pad to equal length before comparing to prevent length-leaking attacks
-  const bufExpected = Buffer.from(expected);
-  const bufProvided = Buffer.alloc(bufExpected.length);
-  Buffer.from(providedKey).copy(bufProvided);
-
-  const isValid =
-    bufExpected.length === Buffer.from(providedKey).length &&
-    timingSafeEqual(bufExpected, bufProvided);
-
-  if (!isValid) {
-    throw new ForbiddenError("Invalid admin key", "ADMIN_KEY_INVALID");
+  if (!safeCompare(providedKey, env.ADMIN_API_KEY)) {
+    next(new ForbiddenError("Invalid admin key", "ADMIN_KEY_INVALID"));
+    return;
   }
 
   next();
