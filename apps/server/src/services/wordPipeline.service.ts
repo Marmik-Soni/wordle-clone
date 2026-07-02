@@ -1,3 +1,11 @@
+// ╔══════════════════════════════════════════════════════════════════════════╗
+// ║  WORD PIPELINE SERVICE — DISABLED                                        ║
+// ║                                                                          ║
+// ║  This service is kept for reference but is not called anywhere.          ║
+// ║  Daily words are served from static JSON files in src/data/.             ║
+// ║  See words.routes.ts for re-enable instructions.                         ║
+// ╚══════════════════════════════════════════════════════════════════════════╝
+
 import { env } from "../config/env.js";
 import { Word } from "../models/Word.js";
 import { logger } from "../utils/logger.js";
