@@ -3,11 +3,23 @@ import mongoose from "mongoose";
 import { AppError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
 
+/** Shape of errors thrown by body-parser (express.json middleware). */
+interface BodyParserError extends Error {
+  type?: string;
+  status?: number;
+}
+
+/** Shape of MongoDB driver errors (duplicate key etc). */
+interface MongoError extends Error {
+  code?: number;
+}
+
 export function errorHandler(
   err: Error,
   req: Request,
   res: Response,
-  next: NextFunction
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _next: NextFunction
 ): void {
   // 1. Errors we threw ourselves — trust them completely
   if (err instanceof AppError) {
@@ -39,7 +51,7 @@ export function errorHandler(
   }
 
   // 4. MongoDB duplicate key (race condition on unique index, e.g. email)
-  if ((err as any).code === 11000) {
+  if ((err as MongoError).code === 11000) {
     res.status(409).json({
       error: { message: "Resource already exists", code: "DUPLICATE_KEY" },
     });
@@ -61,7 +73,7 @@ export function errorHandler(
     return;
   }
 
-  // 6. JWT errors that slipped through unwrapped
+  // 6. JWT errors that slipped through unwrapped middleware
   if (err.name === "TokenExpiredError") {
     res.status(401).json({
       error: { message: "Token expired", code: "TOKEN_EXPIRED" },
@@ -76,7 +88,7 @@ export function errorHandler(
   }
 
   // 7. Malformed JSON body
-  if ((err as any).type === "entity.parse.failed") {
+  if ((err as BodyParserError).type === "entity.parse.failed") {
     res.status(400).json({
       error: { message: "Malformed JSON in request body", code: "MALFORMED_JSON" },
     });
@@ -84,7 +96,7 @@ export function errorHandler(
   }
 
   // 8. Payload too large
-  if ((err as any).type === "entity.too.large") {
+  if ((err as BodyParserError).type === "entity.too.large") {
     res.status(413).json({
       error: { message: "Request body too large", code: "PAYLOAD_TOO_LARGE" },
     });
