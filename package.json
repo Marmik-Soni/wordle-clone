@@ -3,8 +3,8 @@
   "private": true,
   "scripts": {
     "dev:client": "pnpm --filter client dev",
-    "dev:server": "pnpm --filter server dev",
-    "test": "pnpm --filter server test",
+    "dev:server": "pnpm --filter @wordle/server dev",
+    "test": "pnpm --filter @wordle/server test",
     "lint": "pnpm -r lint",
     "build": "pnpm -r build"
   },

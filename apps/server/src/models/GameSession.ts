@@ -2,6 +2,11 @@ import mongoose, { Document, Schema } from "mongoose";
 
 export interface IGameSession extends Document {
   userId: mongoose.Types.ObjectId | null;
+  /**
+   * Stored for historical audit ("which word was this session playing?").
+   * At runtime, the daily word is resolved from the in-memory cache
+   * (getDailyWord()) — NOT populated from this field.
+   */
   wordId: mongoose.Types.ObjectId | null;
   date: string;
   guesses: string[];
