@@ -92,16 +92,20 @@ export async function login(req: Request, res: Response): Promise<void> {
     throw new BadRequestError("Email and password are required", "VALIDATION_ERROR");
   }
 
+  // Redact email for logs — show first char + domain only to avoid PII in log pipelines
+  const [localPart, domain] = email.split("@");
+  const redacted = localPart ? `${localPart[0]}***@${domain ?? "?"}` : "[invalid]";
+
   const user = await User.findOne({ email: email.toLowerCase() });
   if (!user) {
     // Intentionally same message as wrong password — avoids user enumeration
-    logger.warn(`⚠️  Failed login attempt - user not found: ${email}`);
+    logger.warn(`⚠️  Failed login attempt — not found: ${redacted}`);
     throw new UnauthorizedError("Invalid credentials", "INVALID_CREDENTIALS");
   }
 
   const isValid = await bcrypt.compare(password, user.passwordHash);
   if (!isValid) {
-    logger.warn(`⚠️  Failed login attempt - wrong password for: ${email}`);
+    logger.warn(`⚠️  Failed login attempt — wrong password: ${redacted}`);
     throw new UnauthorizedError("Invalid credentials", "INVALID_CREDENTIALS");
   }
 
